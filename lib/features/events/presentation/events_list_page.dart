@@ -40,6 +40,63 @@ class _EventsListPageState extends State<EventsListPage> {
     }
   }
 
+  // ===============================
+  // 🔄 STATUS UPDATE
+  // ===============================
+  Future<void> _updateStatus(String eventId, String status) async {
+    await Supabase.instance.client
+        .from('events')
+        .update({'status': status})
+        .eq('id', eventId);
+
+    await _load();
+  }
+
+  // ===============================
+  // 🗑 DELETE
+  // ===============================
+  Future<void> _deleteEvent(String eventId) async {
+    await Supabase.instance.client.from('events').delete().eq('id', eventId);
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Evento eliminado')));
+
+    await _load();
+  }
+
+  Future<void> _confirmDelete(Map<String, dynamic> event) async {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: const Text('Eliminar evento'),
+        content: Text(
+          '¿Estás seguro de eliminar "${event['name']}"?\n\nEsta acción no se puede deshacer.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            // style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () async {
+              Navigator.pop(context);
+              await _deleteEvent(event['id']);
+            },
+            child: const Text('Eliminar', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ===============================
+  // 📅 FORMAT
+  // ===============================
   String _fmtDate(String? iso) {
     if (iso == null) return '';
     final dt = DateTime.tryParse(iso);
@@ -52,6 +109,9 @@ class _EventsListPageState extends State<EventsListPage> {
         '${local.minute.toString().padLeft(2, '0')}';
   }
 
+  // ===============================
+  // 🎨 STATUS CHIP
+  // ===============================
   Widget _statusChip(String status) {
     late Color bg;
     late Color textColor;
@@ -96,53 +156,203 @@ class _EventsListPageState extends State<EventsListPage> {
     );
   }
 
+  // ===============================
+  // 📌 EVENT CARD
+  // ===============================
   Widget _eventCard(Map<String, dynamic> e) {
     final name = e['name'] ?? '';
     final venue = e['venue_name'] ?? '';
     final status = (e['status'] ?? '').toString();
+    final id = e['id'];
 
-    return InkWell(
-      onTap: () => context.push('/events/${e['id']}'),
-      borderRadius: BorderRadius.circular(24),
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(24),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 16,
-              offset: const Offset(0, 6),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              name,
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              '${_fmtDate(e['starts_at'])} • $venue',
-              style: const TextStyle(color: Colors.grey),
-            ),
-            const SizedBox(height: 12),
-            Row(
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  name,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+
+              // ===============================
+              // 🎯 MENU DINÁMICO
+              // ===============================
+              PopupMenuButton<String>(
+                onSelected: (value) async {
+                  switch (value) {
+                    case 'edit':
+                      final updated = await context.push('/events/$id/edit');
+                      if (updated == true) {
+                        await _load();
+                      }
+                      break;
+
+                    case 'publish':
+                      await _updateStatus(id, 'published');
+                      break;
+
+                    case 'close':
+                      await _updateStatus(id, 'closed');
+                      break;
+
+                    case 'metrics':
+                      context.push('/events/$id');
+                      break;
+
+                    case 'delete':
+                      _confirmDelete(e);
+                      break;
+                  }
+                },
+                itemBuilder: (_) {
+                  List<PopupMenuEntry<String>> items = [];
+
+                  if (status == 'draft') {
+                    items.addAll([
+                      const PopupMenuItem(
+                        value: 'edit',
+                        child: Row(
+                          children: [
+                            Icon(Icons.edit),
+                            SizedBox(width: 8),
+                            Text('Editar'),
+                          ],
+                        ),
+                      ),
+                      const PopupMenuItem(
+                        value: 'publish',
+                        child: Row(
+                          children: [
+                            Icon(Icons.public),
+                            SizedBox(width: 8),
+                            Text('Publicar'),
+                          ],
+                        ),
+                      ),
+                      const PopupMenuDivider(),
+                      const PopupMenuItem(
+                        value: 'delete',
+                        child: Row(
+                          children: [
+                            Icon(Icons.delete, color: Colors.red),
+                            SizedBox(width: 8),
+                            Text('Eliminar'),
+                          ],
+                        ),
+                      ),
+                    ]);
+                  }
+
+                  if (status == 'published') {
+                    items.addAll([
+                      const PopupMenuItem(
+                        value: 'edit',
+                        child: Row(
+                          children: [
+                            Icon(Icons.edit),
+                            SizedBox(width: 8),
+                            Text('Editar'),
+                          ],
+                        ),
+                      ),
+                      const PopupMenuItem(
+                        value: 'close',
+                        child: Row(
+                          children: [
+                            Icon(Icons.lock),
+                            SizedBox(width: 8),
+                            Text('Cerrar evento'),
+                          ],
+                        ),
+                      ),
+                      const PopupMenuItem(
+                        value: 'metrics',
+                        child: Row(
+                          children: [
+                            Icon(Icons.bar_chart),
+                            SizedBox(width: 8),
+                            Text('Ver métricas'),
+                          ],
+                        ),
+                      ),
+                    ]);
+                  }
+
+                  if (status == 'closed') {
+                    items.add(
+                      const PopupMenuItem(
+                        value: 'metrics',
+                        child: Row(
+                          children: [
+                            Icon(Icons.bar_chart),
+                            SizedBox(width: 8),
+                            Text('Ver métricas'),
+                          ],
+                        ),
+                      ),
+                    );
+                  }
+
+                  return items;
+                },
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 6),
+
+          InkWell(
+            onTap: () async {
+              final updated = await context.push('/events/$id');
+              if (updated == true) {
+                await _load();
+              }
+            },
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _statusChip(status),
-                const Spacer(),
-                const Icon(Icons.arrow_forward_ios, size: 16),
+                Text(
+                  '${_fmtDate(e['starts_at'])} • $venue',
+                  style: const TextStyle(color: Colors.grey),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    _statusChip(status),
+                    const Spacer(),
+                    const Icon(Icons.arrow_forward_ios, size: 16),
+                  ],
+                ),
               ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
+  // ===============================
+  // 🏗 BUILD
+  // ===============================
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -153,11 +363,8 @@ class _EventsListPageState extends State<EventsListPage> {
         ),
         actions: [
           IconButton(
-            onPressed: () async {
-              await Supabase.instance.client.auth.signOut();
-              if (context.mounted) context.go('/auth/login');
-            },
-            icon: const Icon(Icons.logout),
+            icon: const Icon(Icons.person_outline),
+            onPressed: () => context.push('/profile'),
           ),
         ],
       ),
@@ -175,29 +382,13 @@ class _EventsListPageState extends State<EventsListPage> {
         onRefresh: _load,
         child: loading
             ? const Center(child: CircularProgressIndicator())
-            : error != null
-            ? ListView(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Text('Error: $error'),
-                  ),
-                ],
-              )
             : events.isEmpty
-            ? ListView(
-                children: const [
-                  Padding(
-                    padding: EdgeInsets.all(24),
-                    child: Center(
-                      child: Text(
-                        'Aún no tienes eventos.\nCrea uno con el botón "Nuevo evento".',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.grey),
-                      ),
-                    ),
-                  ),
-                ],
+            ? const Center(
+                child: Text(
+                  'Aún no tienes eventos.\nCrea uno con el botón "Nuevo evento".',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.grey),
+                ),
               )
             : ListView.separated(
                 padding: const EdgeInsets.all(16),

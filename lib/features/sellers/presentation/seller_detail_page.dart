@@ -7,11 +7,13 @@ import '../../../shared/widgets/copy_share_row.dart';
 class SellerDetailPage extends StatefulWidget {
   final String eventId;
   final String sellerId;
+  final String eventStatus;
 
   const SellerDetailPage({
     super.key,
     required this.eventId,
     required this.sellerId,
+    required this.eventStatus,
   });
 
   @override
@@ -26,6 +28,11 @@ class _SellerDetailPageState extends State<SellerDetailPage> {
   Map<String, dynamic>? sellerPack;
   List<Map<String, dynamic>> allocations = [];
   Map<String, int> metrics = {'total': 0, 'used': 0, 'void': 0, 'available': 0};
+
+  bool get _canModify =>
+      widget.eventStatus == 'draft' || widget.eventStatus == 'published';
+
+  bool get _isClosed => widget.eventStatus == 'closed';
 
   @override
   void initState() {
@@ -355,11 +362,13 @@ Link: $packLink
           IconButton(onPressed: _load, icon: const Icon(Icons.refresh)),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _showAssignTicketsModal,
-        icon: const Icon(Icons.confirmation_num),
-        label: const Text('Asignar tickets'),
-      ),
+      floatingActionButton: _canModify
+          ? FloatingActionButton.extended(
+              onPressed: _showAssignTicketsModal,
+              icon: const Icon(Icons.confirmation_num),
+              label: const Text('Asignar tickets'),
+            )
+          : null,
       body: loading
           ? const Center(child: CircularProgressIndicator())
           : error != null
@@ -367,76 +376,103 @@ Link: $packLink
               padding: const EdgeInsets.all(16),
               child: ErrorBanner(message: error!),
             )
-          : ListView(
-              padding: const EdgeInsets.all(16),
+          : Column(
               children: [
-                Text(
-                  'Estado: ${_statusEs((seller?['status'] ?? '').toString())}',
-                ),
-                const SizedBox(height: 12),
-                Card(
-                  margin: const EdgeInsets.only(bottom: 16),
-                  child: Padding(
+                if (_isClosed)
+                  Container(
+                    width: double.infinity,
                     padding: const EdgeInsets.all(12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Acceso del vendedor',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 8),
-                        _buildPackStatus(),
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            ElevatedButton.icon(
-                              onPressed: _resendSellerPack,
-                              icon: const Icon(Icons.refresh),
-                              label: const Text('Regenerar acceso'),
-                            ),
-                            const SizedBox(width: 12),
-                            OutlinedButton.icon(
-                              onPressed: _revokeSellerPack,
-                              icon: const Icon(Icons.block),
-                              label: const Text('Revocar'),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                _MetricsRow(metrics: metrics),
-                const SizedBox(height: 24),
-                const Text(
-                  'Asignaciones (lotes)',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                if (allocations.isEmpty)
-                  const Text('Este vendedor aún no tiene asignaciones.')
-                else
-                  ...allocations.map(
-                    (a) => Card(
-                      child: ListTile(
-                        title: Text(
-                          'Cantidad: ${a['quantity']} • ${_allocStatusEs(a['status']?.toString() ?? '')}',
-                        ),
-                        subtitle: Text(a['note']?.toString() ?? ''),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const SizedBox(width: 8),
-                            Text(
-                              a['created_at']?.toString().substring(0, 10) ??
-                                  '',
-                            ),
-                          ],
-                        ),
+                    color: Colors.red.shade50,
+                    child: const Text(
+                      'Evento cerrado. No se pueden modificar asignaciones ni accesos.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.red,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
+                Expanded(
+                  child: ListView(
+                    padding: const EdgeInsets.all(16),
+                    children: [
+                      Text(
+                        'Estado: ${_statusEs((seller?['status'] ?? '').toString())}',
+                      ),
+                      const SizedBox(height: 12),
+                      Card(
+                        margin: const EdgeInsets.only(bottom: 16),
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Acceso del vendedor',
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                              const SizedBox(height: 8),
+                              _buildPackStatus(),
+                              const SizedBox(height: 12),
+                              if (_canModify)
+                                Row(
+                                  children: [
+                                    ElevatedButton.icon(
+                                      onPressed: _resendSellerPack,
+                                      icon: const Icon(Icons.refresh),
+                                      label: const Text('Regenerar acceso'),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    OutlinedButton.icon(
+                                      onPressed: _revokeSellerPack,
+                                      icon: const Icon(Icons.block),
+                                      label: const Text('Revocar'),
+                                    ),
+                                  ],
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      _MetricsRow(metrics: metrics),
+                      const SizedBox(height: 24),
+                      const Text(
+                        'Asignaciones (lotes)',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      if (allocations.isEmpty)
+                        const Text('Este vendedor aún no tiene asignaciones.')
+                      else
+                        ...allocations.map(
+                          (a) => Card(
+                            child: ListTile(
+                              title: Text(
+                                'Cantidad: ${a['quantity']} • ${_allocStatusEs(a['status']?.toString() ?? '')}',
+                              ),
+                              subtitle: Text(a['note']?.toString() ?? ''),
+                              trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    a['created_at']?.toString().substring(
+                                          0,
+                                          10,
+                                        ) ??
+                                        '',
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
               ],
             ),
     );

@@ -1,5 +1,8 @@
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:tickets_owner_app/features/auth/presentation/profile_page.dart';
+import 'package:tickets_owner_app/features/events/presentation/event_edit_page.dart';
 
 import '../features/splash/presentation/splash_page.dart';
 import '../features/auth/presentation/session_gate.dart';
@@ -60,6 +63,13 @@ final appRouter = GoRouter(
       builder: (_, state) =>
           EventDetailPage(eventId: state.pathParameters['eventId']!),
     ),
+    GoRoute(
+      path: '/events/:id/edit',
+      builder: (context, state) {
+        final id = state.pathParameters['id']!;
+        return EventEditPage(eventId: id);
+      },
+    ),
 
     /// 👥 Sellers
     GoRoute(
@@ -72,12 +82,36 @@ final appRouter = GoRouter(
       builder: (_, state) =>
           SellerCreatePage(eventId: state.pathParameters['eventId']!),
     ),
+    GoRoute(path: '/profile', builder: (_, __) => const ProfilePage()),
     GoRoute(
       path: '/events/:eventId/sellers/:sellerId',
-      builder: (_, state) => SellerDetailPage(
-        eventId: state.pathParameters['eventId']!,
-        sellerId: state.pathParameters['sellerId']!,
-      ),
+      builder: (_, state) {
+        final eventId = state.pathParameters['eventId']!;
+        final sellerId = state.pathParameters['sellerId']!;
+
+        return FutureBuilder(
+          future: Supabase.instance.client
+              .from('events')
+              .select('status')
+              .eq('id', eventId)
+              .single(),
+          builder: (context, snapshot) {
+            if (!snapshot.hasData) {
+              return const Scaffold(
+                body: Center(child: CircularProgressIndicator()),
+              );
+            }
+
+            final status = snapshot.data!['status'] ?? 'draft';
+
+            return SellerDetailPage(
+              eventId: eventId,
+              sellerId: sellerId,
+              eventStatus: status,
+            );
+          },
+        );
+      },
     ),
   ],
 );
