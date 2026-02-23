@@ -4,8 +4,13 @@ import '../../../shared/widgets/qr_scanner_sheet.dart';
 
 class CheckinsTab extends StatefulWidget {
   final String eventId;
+  final String eventStatus;
 
-  const CheckinsTab({super.key, required this.eventId});
+  const CheckinsTab({
+    super.key,
+    required this.eventId,
+    required this.eventStatus,
+  });
 
   @override
   State<CheckinsTab> createState() => _CheckinsTabState();
@@ -14,6 +19,8 @@ class CheckinsTab extends StatefulWidget {
 class _CheckinsTabState extends State<CheckinsTab> {
   bool loading = true;
   String? error;
+
+  bool get _canScannTicket => widget.eventStatus == 'published';
 
   List<Map<String, dynamic>> checkins = [];
   int total = 0;
@@ -200,32 +207,45 @@ class _CheckinsTabState extends State<CheckinsTab> {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            children: [
-              Expanded(
-                child: ElevatedButton.icon(
-                  icon: const Icon(Icons.qr_code_scanner),
-                  label: const Text('Escanear ticket'),
-                  onPressed: () async {
-                    final result = await Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => QrScannerSheet(eventId: widget.eventId),
-                      ),
-                    );
-
-                    if (result != null) {
-                      _showScanResult(result);
-                      _load();
-                    }
-                  },
-                ),
-              ),
-            ],
+        if (!_canScannTicket)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            color: Colors.red.shade50,
+            child: const Text(
+              'El evento no está publicado. No se pueden escanear nuevos códigos.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.red, fontWeight: FontWeight.w600),
+            ),
           ),
-        ),
+        if (_canScannTicket)
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    icon: const Icon(Icons.qr_code_scanner),
+                    label: const Text('Escanear ticket'),
+                    onPressed: () async {
+                      final result = await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              QrScannerSheet(eventId: widget.eventId),
+                        ),
+                      );
+
+                      if (result != null) {
+                        _showScanResult(result);
+                        _load();
+                      }
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
         // métricas
         Padding(
           padding: const EdgeInsets.all(12),

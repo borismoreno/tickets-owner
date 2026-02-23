@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../tabs/resumen_tab.dart';
 import '../tabs/sellers_tab.dart';
@@ -16,6 +17,7 @@ class _EventDetailPageState extends State<EventDetailPage> {
   bool loading = true;
   String? error;
   Map<String, dynamic>? event;
+
   int totalTickets = 0;
   int totalSellers = 0;
   int totalCheckins = 0;
@@ -54,19 +56,16 @@ class _EventDetailPageState extends State<EventDetailPage> {
 
     final supabase = Supabase.instance.client;
 
-    // Total tickets
     final ticketsRes = await supabase
         .from('tickets')
         .select('id')
         .eq('event_id', widget.eventId);
 
-    // Total sellers
     final sellersRes = await supabase
         .from('sellers')
         .select('id')
         .eq('event_id', widget.eventId);
 
-    // Total check-ins
     final checkinsRes = await supabase
         .from('tickets')
         .select('id')
@@ -87,6 +86,7 @@ class _EventDetailPageState extends State<EventDetailPage> {
           .from('events')
           .update({'status': status})
           .eq('id', widget.eventId);
+
       await _load();
     } catch (e) {
       if (!mounted) return;
@@ -94,6 +94,14 @@ class _EventDetailPageState extends State<EventDetailPage> {
         context,
       ).showSnackBar(SnackBar(content: Text('Error: $e')));
     }
+  }
+
+  /// ✅ NUEVO: navegar a editar
+  Future<void> _goToEdit() async {
+    await context.push('/events/${widget.eventId}/edit');
+
+    // 🔁 Recargar al volver
+    await _load();
   }
 
   Widget _eventStatusChip(String status) {
@@ -112,6 +120,12 @@ class _EventDetailPageState extends State<EventDetailPage> {
         bg = Colors.green.shade100;
         textColor = Colors.green.shade800;
         text = 'Publicado';
+        break;
+
+      case 'closed':
+        bg = Colors.grey.shade300;
+        textColor = Colors.grey.shade800;
+        text = 'Cerrado';
         break;
 
       default:
@@ -159,9 +173,16 @@ class _EventDetailPageState extends State<EventDetailPage> {
           event: event!,
           onPublish: () => _updateStatus('published'),
           onClose: () => _updateStatus('closed'),
+          onEdit: _goToEdit, // ✅ AQUÍ ESTÁ LA CORRECCIÓN
         ),
-        SellersTab(eventId: widget.eventId),
-        CheckinsTab(eventId: widget.eventId),
+        SellersTab(
+          eventId: widget.eventId,
+          eventStatus: event?['status'] ?? 'draft',
+        ),
+        CheckinsTab(
+          eventId: widget.eventId,
+          eventStatus: event?['status'] ?? 'draft',
+        ),
       ],
     );
   }
@@ -169,7 +190,7 @@ class _EventDetailPageState extends State<EventDetailPage> {
   @override
   Widget build(BuildContext context) {
     final title = event?['name'] ?? 'Evento';
-    final status = event?['status'] ?? 'Borrador';
+    final status = event?['status'] ?? 'draft';
 
     return DefaultTabController(
       length: 3,
@@ -188,7 +209,6 @@ class _EventDetailPageState extends State<EventDetailPage> {
             ),
           ],
           bottom: PreferredSize(
-            // 👈 MOVER EL TABBAR AQUÍ
             preferredSize: const Size.fromHeight(60),
             child: _buildTabBar(),
           ),
@@ -197,14 +217,7 @@ class _EventDetailPageState extends State<EventDetailPage> {
             ? const Center(child: CircularProgressIndicator())
             : error != null
             ? Center(child: Text('Error: $error'))
-            : Column(
-                children: [
-                  // _buildHeaderSummary(),
-                  Expanded(
-                    child: _buildTabBarView(), // 👈 SOLO EL VIEW AQUÍ
-                  ),
-                ],
-              ),
+            : Column(children: [Expanded(child: _buildTabBarView())]),
       ),
     );
   }

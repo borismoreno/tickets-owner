@@ -88,7 +88,7 @@ class _SplashPageState extends State<SplashPage>
                   ),
                   SizedBox(height: 20),
                   Text(
-                    "Tickets Owner",
+                    "Fervio",
                     style: TextStyle(
                       fontSize: 28,
                       fontWeight: FontWeight.bold,

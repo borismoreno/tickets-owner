@@ -5,12 +5,14 @@ class ResumenTab extends StatelessWidget {
   final Map<String, dynamic> event;
   final VoidCallback onPublish;
   final VoidCallback onClose;
+  final VoidCallback onEdit;
 
   const ResumenTab({
     super.key,
     required this.event,
     required this.onPublish,
     required this.onClose,
+    required this.onEdit,
   });
 
   @override
@@ -28,6 +30,8 @@ class ResumenTab extends StatelessWidget {
         const SizedBox(height: 12),
         _infoCard(Icons.schedule, 'Fecha', startsAt.toString()),
         const SizedBox(height: 24),
+        _editSection(context, status),
+        const SizedBox(height: 16),
         _actionSection(context, status),
       ],
     );
@@ -115,6 +119,57 @@ class ResumenTab extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+
+  // 🔷 EDIT SECTION (según estado)
+  Widget _editSection(BuildContext context, String status) {
+    if (status == 'closed') {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.grey.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: const Row(
+          children: [
+            Icon(Icons.lock_outline, color: Colors.grey),
+            SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Este evento está cerrado y no puede ser editado.',
+                style: TextStyle(color: Colors.grey),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (status == 'published') {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          OutlinedButton.icon(
+            onPressed: onEdit,
+            icon: const Icon(Icons.edit),
+            label: const Text('Editar evento'),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Solo se pueden editar datos informativos. '
+            'No se permite cambiar la fecha ni configuraciones críticas.',
+            style: TextStyle(fontSize: 12, color: Colors.grey),
+          ),
+        ],
+      );
+    }
+
+    // Draft
+    return ElevatedButton.icon(
+      onPressed: onEdit,
+      icon: const Icon(Icons.edit),
+      label: const Text('Editar evento'),
     );
   }
 
