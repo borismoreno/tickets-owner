@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter/services.dart';
 import '../../../shared/widgets/qr_scanner_sheet.dart';
 
 class CheckinsTab extends StatefulWidget {
@@ -33,47 +34,198 @@ class _CheckinsTabState extends State<CheckinsTab> {
     _load();
   }
 
-  void _showScanResult(Map result) {
+  Future<void> _validateManualTicket(String code) async {
+    if (code.isEmpty) return;
+
+    try {
+      final response = await Supabase.instance.client.functions.invoke(
+        'check_ticket',
+        body: {'manual_code': code},
+      );
+
+      _showScanResult(response.data);
+    } catch (_) {
+      _showScanResult({'reason': 'invalid'});
+    }
+  }
+
+  void _openManualEntry() {
+    final controller = TextEditingController();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (_) {
+        return Padding(
+          padding: EdgeInsets.only(
+            left: 24,
+            right: 24,
+            top: 32,
+            bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                "Ingreso manual",
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
+
+              const SizedBox(height: 20),
+
+              TextField(
+                controller: controller,
+                autofocus: true,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: "Código del ticket",
+                  prefixIcon: Icon(Icons.confirmation_number_outlined),
+                ),
+              ),
+
+              const SizedBox(height: 24),
+
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    _validateManualTicket(controller.text.trim());
+                  },
+                  child: const Text("Validar"),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showScanResult(Map result) async {
     final reason = result['reason'];
 
     String title;
     String message;
-    Color color;
+    Color accentColor;
+    IconData icon;
 
     switch (reason) {
       case 'valid':
         title = 'Ingreso válido';
         message = 'Acceso concedido';
-        color = Colors.green;
+        accentColor = const Color(0xFF22C55E); // verde moderno
+        icon = Icons.check_circle_rounded;
+
+        await HapticFeedback.heavyImpact(); // vibración suave
+
+        // Future.delayed(const Duration(milliseconds: 1200), () {
+        //   if (mounted) Navigator.pop(context);
+        // });
         break;
+
       case 'duplicated':
         title = 'Ticket ya usado';
         message = 'Este QR ya fue registrado';
-        color = Colors.orange;
+        accentColor = const Color(0xFFF59E0B); // amber moderno
+        icon = Icons.info_rounded;
+        await HapticFeedback.mediumImpact(); // vibración media
         break;
+
       case 'revoked':
         title = 'Acceso revocado';
         message = 'Vendedor bloqueado';
-        color = Colors.red;
+        accentColor = const Color(0xFFEF4444); // rojo moderno
+        icon = Icons.cancel_rounded;
+        await HapticFeedback.heavyImpact(); // vibración fuerte
         break;
+
       default:
         title = 'No válido';
         message = 'Ticket inválido';
-        color = Colors.red;
+        accentColor = const Color(0xFFEF4444);
+        icon = Icons.error_rounded;
+        await HapticFeedback.heavyImpact();
     }
+
+    if (!mounted) return;
 
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: color.withValues(alpha: 0.9),
-        title: Text(title),
-        content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('OK'),
+      barrierDismissible: false,
+      builder: (_) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(28),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.08),
+                blurRadius: 24,
+                offset: const Offset(0, 12),
+              ),
+            ],
           ),
-        ],
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Icono circular moderno
+              Container(
+                height: 72,
+                width: 72,
+                decoration: BoxDecoration(
+                  color: accentColor.withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, size: 40, color: accentColor),
+              ),
+
+              const SizedBox(height: 20),
+
+              Text(
+                title,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+
+              const SizedBox(height: 10),
+
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 15, color: Colors.grey),
+              ),
+
+              const SizedBox(height: 28),
+
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: accentColor,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text(
+                    'Continuar',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -243,6 +395,13 @@ class _CheckinsTabState extends State<CheckinsTab> {
                     },
                   ),
                 ),
+                // TextButton(
+                //   onPressed: _openManualEntry,
+                //   child: const Text(
+                //     'Ingresar código manual',
+                //     style: TextStyle(fontWeight: FontWeight.w600),
+                //   ),
+                // ),
               ],
             ),
           ),
