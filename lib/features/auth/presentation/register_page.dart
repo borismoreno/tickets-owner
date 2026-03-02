@@ -94,9 +94,9 @@ class _RegisterPageState extends State<RegisterPage>
     });
 
     try {
-      await Supabase.instance.client.auth.signUp(
-        email: email.text.trim(),
-        password: password.text,
+      await Supabase.instance.client.functions.invoke(
+        'send_verification_code',
+        body: {'email': email.text.trim()},
       );
 
       setState(() => success = true);
@@ -104,7 +104,10 @@ class _RegisterPageState extends State<RegisterPage>
       await Future.delayed(const Duration(milliseconds: 1200));
 
       if (!mounted) return;
-      context.go('/events');
+      context.push(
+        '/auth/verify',
+        extra: {'email': email.text.trim(), 'password': password.text},
+      );
     } catch (e) {
       setState(() => error = 'No se pudo crear la cuenta');
     } finally {

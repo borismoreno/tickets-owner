@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:tickets_owner_app/features/auth/presentation/profile_page.dart';
+import 'package:tickets_owner_app/features/auth/presentation/verify_code_page.dart';
 import 'package:tickets_owner_app/features/events/presentation/event_edit_page.dart';
 
 import '../features/splash/presentation/splash_page.dart';
@@ -54,6 +55,14 @@ final appRouter = GoRouter(
     /// 🔐 Auth
     GoRoute(path: '/auth/login', builder: (_, __) => const LoginPage()),
     GoRoute(path: '/auth/register', builder: (_, __) => const RegisterPage()),
+
+    GoRoute(
+      path: '/auth/verify',
+      builder: (context, state) {
+        final data = state.extra as Map<String, dynamic>;
+        return VerifyCodePage(email: data['email'], password: data['password']);
+      },
+    ),
 
     /// 🎟 Events
     GoRoute(path: '/events', builder: (_, __) => const EventsListPage()),
